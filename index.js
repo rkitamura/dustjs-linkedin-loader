@@ -2,6 +2,7 @@ var Path = require("path");
 var Dust = require("dustjs-linkedin");
 var LoaderUtils = require("loader-utils");
 var Async = require("Async");
+var FS = require("fs");
 
 // Use the `paths` option to generate a template name based on the
 // path of the .dust file.
@@ -9,6 +10,8 @@ var Async = require("Async");
 // E.g. if paths is ["C:\MyApp\dust"] and resourcePath is
 // "C:\MyApp\dust\home\widgets\welcome.dust" then the template name
 // will be "home-widgets-welcome".
+var uniqueNumber = 1;
+
 function getTemplateName(paths, resourcePath) {
     // We want to loop through each path and see if it matches part of the file path.
     for (var i = 0; i < paths.length; i ++) {
@@ -24,7 +27,7 @@ function getTemplateName(paths, resourcePath) {
             return resourcePath
                 .replace(path + Path.sep, "")
                 // If the path includes slashes or spaces, replace them with hyphens.
-                .replace(/[/\\\s]/g, "-");
+                .replace(/[\\\/\s]+/g, "-");
         }
     }
 
@@ -32,6 +35,80 @@ function getTemplateName(paths, resourcePath) {
     // If it's not in a known path, does that mean it's just not a partial, and
     // therefore doesn't need a name? (E.g. we could just return "anonymous123"
     // as long as each .dust file gets a different number?)
+    return "template" + (uniqueNumber++);
+}
+
+function resolveDependency(ctx, dep, paths, callback) {
+    if (dep.partialName) {
+        resolvePartialName(dep.partialName, paths, callback);
+    } else {
+        ctx.resolve(ctx.context, dep.moduleName + ".dust", callback);
+    }
+}
+
+function resolvePartialNameInPath(name, path, callback) {
+    console.log("Looking for", name, "in", path)
+    
+    if (name.length === 0)
+        name = ["index"];
+
+    var head = name[0],
+        dustFile = Path.join(path, (head || "index") + ".dust"),
+        subPath = Path.join(path, head);
+
+    FS.exists(dustFile, function(hasDust) {
+        // Found it!
+        if (hasDust)
+            return callback(null, dustFile);
+
+        if (!head)
+            return callback(null, false);
+        
+        FS.exists(subPath, function(folderExists) {
+            // Found a matching folder! We must go deeper.
+            if (folderExists) {
+                return resolvePartialNameInPath(name.slice(1), subPath, callback);
+            }
+
+            // Not found. However, we might just need to try a longer path component.
+            // E.g. framework-item-grading-list could be framework/item/grading-list
+            // or framework-item/grading/list...
+            if (name.length > 1) {
+                var newName = name.slice(2);
+                newName.unshift(name[0] + "-" + name[1]);
+                //name = (name[0] + "-" + name[1]).concat(name.slice(2));
+                return resolvePartialNameInPath(newName, path, callback);
+            }
+
+            // Not found, or possible to find.
+            return callback(null, false);
+        });
+    });
+}
+
+function resolvePartialName(name, paths, callback) {
+    if (typeof name === "string")
+        return resolvePartialName(name.split(/-/), paths, callback);
+    
+    Async.eachSeries(paths, function(path, cb) {
+        resolvePartialNameInPath(name, path, function(err, result) {
+            if (err)
+                return cb(err);
+
+            // Found it (early return)
+            if (result)
+                return callback(null, result);
+
+            // Try the next path
+            return cb();
+        });
+    }, function(err) {
+        if (err)
+            return callback(err);
+
+        // If we get here, we didn't find it.
+        return callback(undefined);
+    });
 }
 
 // Find {>".path/to/partial"/} references using a regular expression, and
@@ -44,18 +121,20 @@ function getTemplateName(paths, resourcePath) {
 // to the reader.)
 function findDependencies(content) {
     var partials = [];
-    var partialRegExp = /\{>\s*[^"]*"([^"]*)"/g;
+    var partialRegExp = /\{>\s*(?:([\w\d\-]+)|[^"]*"([^"]*)")/g;
     var match;
 
     while ((match = partialRegExp.exec(content))) {
-        var name = match[1];
+        var partialName = match[1],
+            moduleName = match[2];
 
-        // Ignore interpolated template names
-        if (name.indexOf('{') > -1)
+        // Ignore interpolated template names, which have to use quotes
+        if (moduleName && (moduleName.indexOf('{') > -1))
             continue;
         
         partials.push({
-            name: name,
+            partialName: partialName,
+            moduleName: moduleName,
             index: match.index,
             length: match[0].length
         });
@@ -92,13 +171,14 @@ function getDependenciesJS(deps) {
 
 module.exports = function(content) {
     var query = LoaderUtils.parseQuery(this.query);
-    var paths = [];
     
     this.cacheable && this.cacheable();
 
     // Resolving module references is asynchronous.
     var cb = this.async();
-    
+
+    // Partial paths
+    var paths = [];
     if (query.path) 
         paths.push(query.path);
 
@@ -110,13 +190,19 @@ module.exports = function(content) {
     var deps = findDependencies(content);
 
     Async.eachSeries(deps, function(dep, callback) {
-        this.resolve(this.context, dep.name + ".dust", function(err, rawPath) {
+        resolveDependency(this, dep, paths, function(err, rawPath) {
             if (err)
                 return callback(err);
 
+            console.log("Resolved", (dep.partialName || dep.moduleName), "to", rawPath);
+
             dep.rawPath = rawPath;
             this.addDependency(rawPath);
-            dep.newName = getTemplateName(paths, rawPath);
+
+            var newName = getTemplateName(paths, rawPath);
+            if (dep.partialName && dep.partialName != newName)
+                return callback(new Error("Partial name doesn't resolve to itself: " + dep.partialName + " -> " + newName));
+            dep.newName = newName;
 
             return callback();
         }.bind(this));

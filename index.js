@@ -165,8 +165,8 @@ function rewriteDependencies(content, deps) {
 // is required.
 function getDependenciesJS(deps) {
     return deps.map(function(dep) {
-        return "require(" + JSON.stringify(dep.rawPath) + ")";
-    }).join(";\n");
+        return "require(" + JSON.stringify(dep.rawPath) + ");";
+    }).join("\n");
 }
 
 module.exports = function(content) {

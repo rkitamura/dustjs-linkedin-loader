@@ -11,10 +11,11 @@ var FS = require("fs");
 // "C:\MyApp\dust\home\widgets\welcome.dust" then the template name
 // will be "home-widgets-welcome".
 var uniqueNumber = 1;
+var moduleMapping = {};
 
 function getTemplateName(paths, resourcePath) {
     // We want to loop through each path and see if it matches part of the file path.
-    for (var i = 0; i < paths.length; i ++) {
+    for (var i = 0; i < paths.length; i++) {
         var path = paths[i];
         
         if (resourcePath.indexOf(path) == 0) {
@@ -31,11 +32,15 @@ function getTemplateName(paths, resourcePath) {
         }
     }
 
+    resourcePath = Path.resolve(resourcePath);
+    if (resourcePath in moduleMapping)
+        return moduleMapping[resourcePath];
+    
     // XXX what to do here?
     // If it's not in a known path, does that mean it's just not a partial, and
     // therefore doesn't need a name? (E.g. we could just return "anonymous123"
     // as long as each .dust file gets a different number?)
-    return "template" + (uniqueNumber++);
+    return moduleMapping[resourcePath] = "anonymousTemplate" + (uniqueNumber++);
 }
 
 function resolveDependency(ctx, dep, paths, callback) {
@@ -150,7 +155,7 @@ function rewriteDependencies(content, deps) {
         chunks = [];
 
     deps.forEach(function(dep) {
-        chunks.push(content.substr(index, dep.index));
+        chunks.push(content.substring(index, dep.index));
         chunks.push('{>' + dep.newName);
         index = dep.index + dep.length;
     });
@@ -185,8 +190,6 @@ module.exports = function(content) {
     if (query.paths)
         paths.push.apply(paths, query.paths);
     
-    paths.push(this.options.context);
-
     var deps = findDependencies(content);
 
     Async.eachSeries(deps, function(dep, callback) {
@@ -194,6 +197,9 @@ module.exports = function(content) {
             if (err)
                 return callback(err);
 
+            if (!rawPath)
+                return callback(new Error("Unable to resolve dust partial: " + (dep.partialName || dep.moduleName)));
+            
             console.log("Resolved", (dep.partialName || dep.moduleName), "to", rawPath);
 
             dep.rawPath = rawPath;
@@ -213,6 +219,13 @@ module.exports = function(content) {
         content = rewriteDependencies(content, deps);
         var templateName = getTemplateName(paths, this.resourcePath);
 
+        var compiled;
+        try {
+            compiled = Dust.compile(content, templateName);
+        } catch(e) {
+            return cb(e);
+        }
+        
         var output = [
             // The output of the compile function requires that the variable 'dust' exists. Without a module system, 'dust'
             // would exist on the window, making it a global variable.
@@ -222,7 +235,7 @@ module.exports = function(content) {
             getDependenciesJS(deps),
             
             // Compile the template returning an stringified IIFE registering the template under the name in 'templateName'.
-            Dust.compile(content, templateName) + "\n",
+            compiled + "\n",
             
             // Return the template name to make the require statement more meaningful.
             "module.exports = " + JSON.stringify(templateName) + ";"

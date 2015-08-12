@@ -10,7 +10,7 @@
     "loader-utils": "0.2.11"
   },
   "peerDependencies": {
-    "dustjs-linkedin": "2.7.2"
+    "dustjs-linkedin": "^2.0.0"
   },
   "repository": {
     "type": "git",

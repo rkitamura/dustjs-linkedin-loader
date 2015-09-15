@@ -47,7 +47,12 @@ function resolveDependency(ctx, dep, paths, callback) {
     if (dep.partialName) {
         resolvePartialName(dep.partialName, paths, callback);
     } else {
-        ctx.resolve(ctx.context, dep.moduleName + ".dust", callback);
+        ctx.resolve(ctx.context, dep.moduleName + ".dust", function(err, path) {
+            if (err)
+                return ctx.resolve(ctx.context, dep.moduleName + "/index.dust", callback);
+                
+            return callback(null, path);
+        });
     }
 }
 

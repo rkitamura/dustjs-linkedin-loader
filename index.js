@@ -19,12 +19,11 @@ function getTemplateName(paths, resourcePath) {
         var path = paths[i];
         
         if (resourcePath.indexOf(path) == 0) {
-            if (Path.basename(resourcePath) == "index.dust") {
+            if (Path.basename(resourcePath) == "index.dust")
                 resourcePath = Path.dirname(resourcePath);
-            } else {
+            else
                 resourcePath = resourcePath.replace(/\.dust$/i, "");
-            }
-            
+
             return resourcePath
                 .replace(path + Path.sep, "")
                 // If the path includes slashes or spaces, replace them with hyphens.
@@ -32,14 +31,15 @@ function getTemplateName(paths, resourcePath) {
         }
     }
 
+    // If it's not in a known path, which means it's just not a partial, and
+    // therefore doesn't need a name. (We just return "anonymous123", where
+    // each .dust file gets a different number.)
+
+    // Don't generate different template names for the same template.
     resourcePath = Path.resolve(resourcePath);
     if (resourcePath in moduleMapping)
         return moduleMapping[resourcePath];
-    
-    // XXX what to do here?
-    // If it's not in a known path, does that mean it's just not a partial, and
-    // therefore doesn't need a name? (E.g. we could just return "anonymous123"
-    // as long as each .dust file gets a different number?)
+
     return moduleMapping[resourcePath] = "anonymousTemplate" + (uniqueNumber++);
 }
 
@@ -57,7 +57,7 @@ function resolveDependency(ctx, dep, paths, callback) {
 }
 
 function resolvePartialNameInPath(name, path, callback) {
-    console.log("Looking for", name, "in", path)
+    //console.log("Looking for", name, "in", path)
     
     if (name.length === 0)
         name = ["index"];
@@ -204,8 +204,9 @@ module.exports = function(content) {
 
             if (!rawPath)
                 return callback(new Error("Unable to resolve dust partial: " + (dep.partialName || dep.moduleName)));
-            
-            console.log("Resolved", (dep.partialName || dep.moduleName), "to", rawPath);
+
+            if (query.verbose)
+                console.log("Resolved", (dep.partialName || dep.moduleName), "to", rawPath);
 
             dep.rawPath = rawPath;
             this.addDependency(rawPath);
@@ -240,7 +241,7 @@ module.exports = function(content) {
             getDependenciesJS(deps),
             
             // Compile the template returning an stringified IIFE registering the template under the name in 'templateName'.
-            compiled + "\n",
+            "\n" + compiled + "\n",
             
             // Return the template name to make the require statement more meaningful.
             "module.exports = " + JSON.stringify(templateName) + ";"

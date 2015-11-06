@@ -1,7 +1,7 @@
 var Path = require("path");
 var Dust = require("dustjs-linkedin");
 var LoaderUtils = require("loader-utils");
-var Async = require("Async");
+var Async = require("async");
 var FS = require("fs");
 
 // Use the `paths` option to generate a template name based on the

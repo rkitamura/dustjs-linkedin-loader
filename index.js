@@ -57,13 +57,13 @@ function resolveDependency(ctx, dep, paths, callback) {
 }
 
 function resolvePartialNameInPath(name, path, callback) {
-    //console.log("Looking for", name, "in", path)
-    
+    //console.log("Looking for", name, "in", path);
+
     if (name.length === 0)
         name = ["index"];
-
+    
     var head = name[0],
-        dustFile = Path.join(path, (head || "index") + ".dust"),
+        dustFile = Path.join.apply(Path, [path].concat(name)) + ".dust",
         subPath = Path.join(path, head);
 
     FS.exists(dustFile, function(hasDust) {

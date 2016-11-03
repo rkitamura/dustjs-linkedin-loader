@@ -1,13 +1,13 @@
 {
   "name": "dustjs-linkedin-loader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Webpack loader for DustJS (LinkedIn)",
   "author": {
     "name": "Lewis Barnes"
   },
   "main": "index.js",
   "dependencies": {
-    "loader-utils": "0.2.11"
+    "loader-utils": "^0.2.16"
   },
   "peerDependencies": {
     "dustjs-linkedin": "^2.0.0"

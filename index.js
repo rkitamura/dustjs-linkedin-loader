@@ -244,7 +244,9 @@ module.exports = function(content) {
             "\n" + compiled + "\n",
             
             // Return the template name to make the require statement more meaningful.
-            "module.exports = " + JSON.stringify(templateName) + ";"
+            "module.exports = " + JSON.stringify(templateName) + ";",
+
+            "if (module.hot) { module.hot.accept(); }"
         ].join("");
 
         return cb(null, output);

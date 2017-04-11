@@ -24,10 +24,11 @@ function getTemplateName(paths, resourcePath) {
             else
                 resourcePath = resourcePath.replace(/\.dust$/i, "");
 
-            return resourcePath
+            var output = resourcePath
                 .replace(path + Path.sep, "")
                 // If the path includes spaces, replace them with hyphens.
                 .replace(/[\s]+/g, "-");
+            return output;
         }
     }
 
@@ -85,7 +86,7 @@ function resolvePartialNameInPath(name, path, callback) {
             // or framework-item/grading/list...
             if (name.length > 1) {
                 var newName = name.slice(2);
-                newName.unshift(name[0] + "-" + name[1]);
+                newName.unshift(name[0] + "/" + name[1]);
                 //name = (name[0] + "-" + name[1]).concat(name.slice(2));
                 return resolvePartialNameInPath(newName, path, callback);
             }
@@ -98,7 +99,7 @@ function resolvePartialNameInPath(name, path, callback) {
 
 function resolvePartialName(name, paths, callback) {
     if (typeof name === "string")
-        return resolvePartialName(name.split(/-/), paths, callback);
+        return resolvePartialName(name.split("/"), paths, callback);
     
     Async.eachSeries(paths, function(path, cb) {
         resolvePartialNameInPath(name, path, function(err, result) {

@@ -26,8 +26,8 @@ function getTemplateName(paths, resourcePath) {
 
             return resourcePath
                 .replace(path + Path.sep, "")
-                // If the path includes slashes or spaces, replace them with hyphens.
-                .replace(/[\\\/\s]+/g, "-");
+                // If the path includes spaces, replace them with hyphens.
+                .replace(/[\s]+/g, "-");
         }
     }
 
